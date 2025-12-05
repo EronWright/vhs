@@ -33,7 +33,10 @@ Sleep 100ms
 Sleep 3
 Wait
 Wait+Screen
-Wait@100ms /foobar/`
+Wait@100ms /foobar/
+WaitScreenSettled 500ms
+WaitScreenSettled 2s
+WaitScreenSettled 1`
 
 	expected := []Command{
 		{Type: token.SET, Options: "TypingSpeed", Args: "100ms"},
@@ -59,6 +62,9 @@ Wait@100ms /foobar/`
 		{Type: token.WAIT, Args: "Line"},
 		{Type: token.WAIT, Args: "Screen"},
 		{Type: token.WAIT, Options: "100ms", Args: "Line foobar"},
+		{Type: token.WAIT_SCREEN_SETTLED, Args: "500ms"},
+		{Type: token.WAIT_SCREEN_SETTLED, Args: "2s"},
+		{Type: token.WAIT_SCREEN_SETTLED, Args: "1s"},
 	}
 
 	l := lexer.New(input)

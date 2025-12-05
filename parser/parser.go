@@ -51,6 +51,7 @@ var CommandTypes = []CommandType{ //nolint: deadcode
 	token.TYPE,
 	token.UP,
 	token.WAIT,
+	token.WAIT_SCREEN_SETTLED,
 	token.SOURCE,
 	token.SCREENSHOT,
 	token.COPY,
@@ -171,6 +172,8 @@ func (p *Parser) parseCommand() []Command {
 		return []Command{p.parseShow()}
 	case token.WAIT:
 		return []Command{p.parseWait()}
+	case token.WAIT_SCREEN_SETTLED:
+		return []Command{p.parseWaitScreenSettled()}
 	case token.SOURCE:
 		return p.parseSource()
 	case token.SCREENSHOT:
@@ -185,6 +188,17 @@ func (p *Parser) parseCommand() []Command {
 		p.errors = append(p.errors, NewError(p.cur, "Invalid command: "+p.cur.Literal))
 		return []Command{{Type: token.ILLEGAL}}
 	}
+}
+
+// parseWaitScreenSettled parses a WaitScreenSettled command.
+// WaitScreenSettled waits until the screen content has not changed
+// for a specified duration.
+//
+//	WaitScreenSettled <time>
+func (p *Parser) parseWaitScreenSettled() Command {
+	cmd := Command{Type: token.WAIT_SCREEN_SETTLED}
+	cmd.Args = p.parseTime()
+	return cmd
 }
 
 func (p *Parser) parseWait() Command {

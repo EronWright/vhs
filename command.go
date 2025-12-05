@@ -39,35 +39,36 @@ type CommandFunc func(c parser.Command, v *VHS) error
 
 // CommandFuncs maps command types to their executable functions.
 var CommandFuncs = map[parser.CommandType]CommandFunc{
-	token.BACKSPACE:  ExecuteKey(input.Backspace),
-	token.DELETE:     ExecuteKey(input.Delete),
-	token.INSERT:     ExecuteKey(input.Insert),
-	token.DOWN:       ExecuteKey(input.ArrowDown),
-	token.ENTER:      ExecuteKey(input.Enter),
-	token.LEFT:       ExecuteKey(input.ArrowLeft),
-	token.RIGHT:      ExecuteKey(input.ArrowRight),
-	token.SPACE:      ExecuteKey(input.Space),
-	token.UP:         ExecuteKey(input.ArrowUp),
-	token.TAB:        ExecuteKey(input.Tab),
-	token.ESCAPE:     ExecuteKey(input.Escape),
-	token.PAGE_UP:    ExecuteKey(input.PageUp),
-	token.PAGE_DOWN:  ExecuteKey(input.PageDown),
-	token.HIDE:       ExecuteHide,
-	token.REQUIRE:    ExecuteRequire,
-	token.SHOW:       ExecuteShow,
-	token.SET:        ExecuteSet,
-	token.OUTPUT:     ExecuteOutput,
-	token.SLEEP:      ExecuteSleep,
-	token.TYPE:       ExecuteType,
-	token.CTRL:       ExecuteCtrl,
-	token.ALT:        ExecuteAlt,
-	token.SHIFT:      ExecuteShift,
-	token.ILLEGAL:    ExecuteNoop,
-	token.SCREENSHOT: ExecuteScreenshot,
-	token.COPY:       ExecuteCopy,
-	token.PASTE:      ExecutePaste,
-	token.ENV:        ExecuteEnv,
-	token.WAIT:       ExecuteWait,
+	token.BACKSPACE:           ExecuteKey(input.Backspace),
+	token.DELETE:              ExecuteKey(input.Delete),
+	token.INSERT:              ExecuteKey(input.Insert),
+	token.DOWN:                ExecuteKey(input.ArrowDown),
+	token.ENTER:               ExecuteKey(input.Enter),
+	token.LEFT:                ExecuteKey(input.ArrowLeft),
+	token.RIGHT:               ExecuteKey(input.ArrowRight),
+	token.SPACE:               ExecuteKey(input.Space),
+	token.UP:                  ExecuteKey(input.ArrowUp),
+	token.TAB:                 ExecuteKey(input.Tab),
+	token.ESCAPE:              ExecuteKey(input.Escape),
+	token.PAGE_UP:             ExecuteKey(input.PageUp),
+	token.PAGE_DOWN:           ExecuteKey(input.PageDown),
+	token.HIDE:                ExecuteHide,
+	token.REQUIRE:             ExecuteRequire,
+	token.SHOW:                ExecuteShow,
+	token.SET:                 ExecuteSet,
+	token.OUTPUT:              ExecuteOutput,
+	token.SLEEP:               ExecuteSleep,
+	token.TYPE:                ExecuteType,
+	token.CTRL:                ExecuteCtrl,
+	token.ALT:                 ExecuteAlt,
+	token.SHIFT:               ExecuteShift,
+	token.ILLEGAL:             ExecuteNoop,
+	token.SCREENSHOT:          ExecuteScreenshot,
+	token.COPY:                ExecuteCopy,
+	token.PASTE:               ExecutePaste,
+	token.ENV:                 ExecuteEnv,
+	token.WAIT:                ExecuteWait,
+	token.WAIT_SCREEN_SETTLED: ExecuteWaitScreenSettled,
 }
 
 // ExecuteNoop is a no-op command that does nothing.
@@ -105,6 +106,37 @@ func ExecuteKey(k input.Key) CommandFunc {
 
 // WaitTick is the amount of time to wait between checking for a match.
 const WaitTick = 10 * time.Millisecond
+
+// ExecuteWaitScreenSettled is a CommandFunc that waits until the screen content
+// has not changed for the specified duration.
+func ExecuteWaitScreenSettled(c parser.Command, v *VHS) error {
+	settledDuration, err := time.ParseDuration(c.Args)
+	if err != nil {
+		return fmt.Errorf("failed to parse duration: %w", err)
+	}
+
+	var lastContent string
+	lastChangeTime := time.Now()
+
+	for {
+		lines, err := v.Buffer()
+		if err != nil {
+			return fmt.Errorf("failed to get buffer: %w", err)
+		}
+		currentContent := strings.Join(lines, "\n")
+
+		if currentContent != lastContent {
+			lastContent = currentContent
+			lastChangeTime = time.Now()
+		}
+
+		if time.Since(lastChangeTime) >= settledDuration {
+			return nil
+		}
+
+		time.Sleep(WaitTick)
+	}
+}
 
 // ExecuteWait is a CommandFunc that waits for a regex match for the given amount of time.
 func ExecuteWait(c parser.Command, v *VHS) error {
