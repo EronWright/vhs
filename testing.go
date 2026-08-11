@@ -65,9 +65,15 @@ func (v *VHS) SaveOutput() error {
 }
 
 // Buffer returns the current buffer.
+//
+// getLine takes an ABSOLUTE buffer index, so reading 0..rows-1 returns the
+// oldest rows in scrollback rather than what is on screen. Those stop changing
+// the moment output scrolls past one screenful — which is why Wait+Screen goes
+// blind on a long session, and why WaitScreenSettled "settles" almost
+// immediately. Offset by baseY to read the live screen instead.
 func (v *VHS) Buffer() ([]string, error) {
 	// Get the current buffer.
-	buf, err := v.Page.Eval("() => Array(term.rows).fill(0).map((e, i) => term.buffer.active.getLine(i).translateToString().trimEnd())")
+	buf, err := v.Page.Eval("() => { const b = term.buffer.active; return Array(term.rows).fill(0).map((e, i) => { const l = b.getLine(b.baseY + i); return l ? l.translateToString().trimEnd() : ''; }); }")
 	if err != nil {
 		return nil, fmt.Errorf("read buffer: %w", err)
 	}
@@ -82,8 +88,16 @@ func (v *VHS) Buffer() ([]string, error) {
 }
 
 // CurrentLine returns the current line from the buffer.
+//
+// The cursor's ABSOLUTE buffer index is baseY+cursorY, not viewportY+cursorY:
+// xterm.js reports cursorY relative to baseY (the top of the bottom page),
+// while viewportY is merely where the viewport happens to be scrolled to.
+// The two are equal only while the viewport is pinned to the bottom — so the
+// viewportY form works right up until the viewport stops following output,
+// after which Wait+Line silently reads some unrelated line forever and the
+// tape hangs until its timeout discards the whole recording.
 func (v *VHS) CurrentLine() (string, error) {
-	buf, err := v.Page.Eval("() => term.buffer.active.getLine(term.buffer.active.cursorY+term.buffer.active.viewportY).translateToString().trimEnd()")
+	buf, err := v.Page.Eval("() => { const b = term.buffer.active; const l = b.getLine(b.baseY + b.cursorY); return l ? l.translateToString().trimEnd() : ''; }")
 	if err != nil {
 		return "", fmt.Errorf("read current line from buffer: %w", err)
 	}

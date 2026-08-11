@@ -186,6 +186,15 @@ func (vhs *VHS) Setup() {
 	// Fit the terminal into the window
 	vhs.Page.MustEval("term.fit")
 
+	// Pin the viewport to the live end on every parsed write. A long,
+	// output-heavy session can leave xterm.js scrolled away from the bottom;
+	// correcting that from the record loop only fixes it after the fact, so up
+	// to a full tick of top-of-buffer frames still reach the video as a visible
+	// flash of the session start. Hooking the write path closes that window.
+	// Guarded: onWriteParsed is xterm.js >= 5, and the record-loop tick remains
+	// as the fallback for builds without it.
+	_, _ = vhs.Page.Eval("() => { if (term.onWriteParsed) term.onWriteParsed(() => term.scrollToBottom()) }")
+
 	_ = os.RemoveAll(vhs.Options.Video.Input)
 	_ = os.MkdirAll(vhs.Options.Video.Input, 0o750)
 }
@@ -349,6 +358,16 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 				}
 				if vhs.Page == nil {
 					continue
+				}
+
+				// Keep the viewport pinned to the bottom. A long, output-heavy
+				// session can leave xterm.js scrolled away from the live end —
+				// after which every captured frame is the same stale screen and
+				// the recording is worthless. Once a second is enough to correct
+				// it without adding meaningful CDP traffic; errors are ignored
+				// because this is a nicety, not a reason to fail a take.
+				if counter%vhs.Options.Video.Framerate == 0 {
+					_, _ = vhs.Page.Eval("() => term.scrollToBottom()")
 				}
 
 				cursor, cursorErr := vhs.CursorCanvas.CanvasToImage("image/png", quality)
